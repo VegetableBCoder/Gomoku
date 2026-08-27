@@ -78,18 +78,15 @@ class Point:
             yyy = yy - 1
             yyyy = yyy - 1
         ans=[0 for i in range(3)]
-        if xx>=0 and xx<19 and yy>=0 and yy<19:
-            ans[0]=self.record[xx][yy]
-            if xxx>=0 and xxx<19 and yyy>=0 and yyy<19:
-                ans[1] = self.record[xxx][yyy]
-                if xxxx>=0 and xxxx<19 and yyyy>=0 and yyyy<19:
-                    ans[2] = self.record[xxxx][yyyy]
-                else:
-                    ans[2]=3
-            else:
-                ans[1]=3
-        else:
-            ans[0]=3
+        if xx<0 or xx>=19 or yy<0 or yy>=19:
+            return [3,3,3]
+        ans[0]=self.record[xx][yy]
+        if xxx<0 or xxx>=19 or yyy<0 or yyy>=19:
+            return [ans[0],3,3]
+        ans[1]=self.record[xxx][yyy]
+        if xxxx<0 or xxxx>=19 or yyyy<0 or yyyy>=19:
+            return [ans[0],ans[1],3]
+        ans[2]=self.record[xxxx][yyyy]
         return ans
     def getLeft(self):
         """
@@ -235,25 +232,25 @@ class Point:
             elif same[i]+same[i+4]==3:
                 ans=self.whichTwo(i)
                 if ans==0:
-                    type[i]==4
+                    type[i]=4
                 elif ans==1:
                     type[i]=7
                 elif ans==2:
-                    type[i]==6
+                    type[i]=6
                 elif ans==3:
-                    type[i]==9
+                    type[i]=9
                 else:
                     type[i]=99
             elif same[i] + same[i + 4] == 2:
                 ans=self.single(i)
                 if ans==0:
-                    type[i]==8
+                    type[i]=8
                 elif ans==1:
-                    type[i]==10
+                    type[i]=10
                 elif ans==2:
-                    type[i]==11
+                    type[i]=11
                 else:
-                    type[i]==99
+                    type[i]=99
         #if self.x==7 and self.y==7:
          #   print("type=",type)
         return type
@@ -332,11 +329,11 @@ class Point:
         if a[0]==0:
             if a[1]==self.color:
                 if a[2]==0:
-                    bool==True
+                    bool=True
         elif b[0]==0:
             if b[1]==self.color:
                 if b[2]==0:
-                    bool==True
+                    bool=True
         return bool
     def single(self,dir):
         """
@@ -396,7 +393,7 @@ class Point:
             ans=100000
         elif type[0]==1:#双活四
             if type[1]==1:
-                ans==80000
+                ans=80000
             else:
                 ans=50000
         elif type[0]==2:#双死四，死四活三
@@ -447,7 +444,6 @@ class Point:
     def win(self):
         self.setSame()
         for i in range(4):
-            if self.same[i]+same[i]>5:
+            if self.same[i]+self.same[i+4]>5:
                 return True
-            else:
-                return False
+        return False

@@ -25,10 +25,7 @@ rect=None
 turn=""
 v=StringVar()
 v.set("电脑先手")
-if v.get()=="电脑先手":
-    turn = "per"
-else:
-    turn="com"
+turn = "per"
 def cacu_pos():
 	position[0][0]=(36,37)
 	for i in range(1,19):
@@ -63,7 +60,7 @@ def restart():
         for j in range(19):
             record[i][j]=0
     loadByRecord(record)
-    if v.get()=="玩家先手":
+    if v.get()=="电脑先手":
         turn = "per"
         draw_circle(position[9][9], "com")
         record[9][9] = 2
@@ -130,10 +127,7 @@ def callback(event):
                 if test.getGrade() == 100000:
                     show_win("com")
 
-    elif turn=="com":
-        turn = "per"
-        draw_circle(position[9][9],"com")
-        record[9][9]=2
+
 def drawrect(pos):
     global rect
     if rect!=None:
@@ -190,7 +184,8 @@ def com_draw():
                 q = Point(record,i,j,1)
                 pGrade=p.getGrade()
                 qGrade=q.getGrade()
-                if 1.05*pGrade+qGrade>max1+max2:
+                grade=1.05*pGrade+qGrade
+                if grade>max1+max2 or (grade==max1+max2 and abs(i-9)+abs(j-9)<abs(x-9)+abs(y-9)):
                     max1=pGrade
                     max2=qGrade
                     x=i
@@ -220,7 +215,7 @@ button_restart.pack(side="left")
 button_turn.pack(side="left")
 button_save.pack(side="left")
 button_load.pack(side="left")
-if turn=="com":
+if v.get()=="电脑先手":
     turn = "per"
     draw_circle(position[9][9], "com")
     record[9][9] = 2
