@@ -1,12 +1,13 @@
 """监督训练 五子棋 policy+value 双头模型。
 
-用法(冒烟, 8x128, 20 个分片):
-    .venv/bin/python train.py --data /home/kita-ikuyo/dataset/processed \
-        --limit-shards 20 --val-shards 3 --epochs 1 --batch-size 1024 --out runs/smoke
+数据目录默认读项目根目录 .env 的 GOBANG_PROCESSED_DIR（见 .env.example），
+也可用 --data 显式覆盖。
+
+用法(冒烟, 8x128, 5 个分片):
+    uv run python -m training.train --limit-shards 5 --epochs 1 --batch-size 1024 --out runs/smoke
 
 用法(全量):
-    .venv/bin/python train.py --data /home/kita-ikuyo/dataset/processed \
-        --epochs 2 --batch-size 1024 --amp --out runs/full
+    uv run python -m training.train --epochs 2 --batch-size 1024 --amp --out runs/full
 """
 import argparse
 import json
@@ -17,6 +18,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from gomoku.config import processed_dir
 from training.model import GomokuNet
 from training.loader_katago import KatagoShards
 
@@ -52,7 +54,8 @@ def evaluate(model, valset, device, bs, amp):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="/home/kita-ikuyo/dataset/processed")
+    ap.add_argument("--data", default=str(processed_dir()),
+                    help="训练数据根目录（默认读 .env 的 GOBANG_PROCESSED_DIR）")
     ap.add_argument("--blocks", type=int, default=8)
     ap.add_argument("--channels", type=int, default=128)
     ap.add_argument("--epochs", type=int, default=1)

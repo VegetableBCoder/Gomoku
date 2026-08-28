@@ -234,3 +234,6 @@ apks/
 # 训练输出
 runs/
 *.log
+
+# 模型产物
+models/

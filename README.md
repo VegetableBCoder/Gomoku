@@ -8,12 +8,13 @@
 
 ## 环境与安装
 
-要求：uv ≥ 0.12、Python ≥ 3.10（项目在 3.14.4 上开发/测试）。
+要求：uv ≥ 0.12、Python ≥ 3.10（推荐 3.14）。
 
 ```bash
-# 1. 配置清华源（uv 依赖下载不走本地代理）
-#    uv.toml 已配置 [pip] index-url = 清华源
-#    并确保 NO_PROXY 包含 pypi.tuna.tsinghua.edu.cn
+# 1. 配置镜像源（可选，国内建议清华源，并让 uv 不走本地代理）
+#    cp .env.example .env 后按需修改
+#    [pip] index-url = https://pypi.tuna.tsinghua.edu.cn/simple   # uv.toml
+#    确保 NO_PROXY 包含 pypi.tuna.tsinghua.edu.cn
 
 # 2. 安装依赖（核心 + GUI）
 uv sync
@@ -22,6 +23,27 @@ uv sync
 sudo apt install -y python3-tk
 ```
 
+## 环境配置（.env）
+
+项目内所有路径都通过项目根目录的 `.env` 配置，**不硬编码任何本机绝对路径**。
+复制模板并按需修改：
+
+```bash
+cp .env.example .env
+# 默认值即以项目根为基准的相对路径，多数情况下无需修改
+```
+
+| 变量 | 默认值 | 用途 |
+|---|---|---|
+| `GOBANG_DATA_ROOT` | `./data` | 原始数据下载根目录（download 脚本 --target） |
+| `GOBANG_RAW_DIR` | `./data/fs15x_label28b` | 原始 ModelScope 数据子集（preprocess --raw） |
+| `GOBANG_PROCESSED_DIR` | `./data/processed` | 预处理后的训练数据（train.py --data 默认） |
+| `GOBANG_RUNS_DIR` | `./runs` | 训练输出目录 |
+| `GOBANG_MODEL_DIR` | `./models` | 模型 checkpoint 存放目录 |
+
+优先级：进程环境变量 > `.env` > 默认值。`.env` 不入库（gitignore），迁移给别人
+只需给 `.env.example`。
+
 ## 目录结构
 
 ```
@@ -29,6 +51,7 @@ gomoku/                核心包（纯逻辑，无 GUI）
   board.py             15×15 棋盘引擎：落子/撤销/胜负/合法位
   patterns.py          棋型评估：活四/冲四/活三/眠三/活二 + 威胁阶梯
   point15.py           旧 point.py 的 15×15 移植版
+  config.py            .env 配置加载（无额外依赖）
   players/
     greedy.py          贪心棋手（威胁阶梯 + 1-ply 前瞻）
     random.py          随机棋手（基线）
@@ -44,11 +67,25 @@ scripts/
   gpu_monitor.sh           远程 GPU 功率/温度落盘监控
 gui.py                 人机 GUI（自绘棋盘 + legacy PNG 棋子）
 evaluate.py            棋手对战评估 CLI
-models/                训练好的 checkpoint 存放处
+models/                模型 checkpoint（gitignore）
 runs/                  训练输出/日志（gitignore）
+data/                  数据（下载/预处理产物，gitignore）
 tests/                 引擎/棋手单测
 legacy/                旧版 tkinter GUI + point.py（保留）
 ```
+
+## 数据准备（从零到可训练）
+
+```bash
+# 1. 下载原始数据（ModelScope fs15x_label28b，约 11.9GB，可断点续传）
+uv run python scripts/download_ms_dataset.py
+
+# 2. 预处理成训练格式（npz 裁剪 + unpack，多进程）
+uv run python scripts/preprocess_katago.py --workers 8
+```
+
+处理完的 `data/processed` 里：train 2514 分片 × ~25.2K ≈ **6360 万局面**；val 200 分片。
+每个 npz：`board (N,2,15,15) uint8`、`policy (N,225) int16 计数`、`value (N,3) float16`。
 
 ## 快速上手
 
@@ -56,7 +93,7 @@ legacy/                旧版 tkinter GUI + point.py（保留）
 # 人机对战（电脑 = 贪心）
 uv run python gui.py
 
-# 人机对战（电脑 = 神经网络，推荐当前模型）
+# 人机对战（电脑 = 神经网络，--model 指向任意 checkpoint）
 uv run python gui.py --model models/ckpt_ep0_shard59.pt
 #   可选: --device cuda/cpu  --temperature 0.3(采样) 0(贪心,默认)
 
@@ -70,24 +107,15 @@ uv run python -m tests.test_board
 
 ## 训练
 
-### 数据
-
-- 预处理后：`/home/kita-ikuyo/dataset/processed`（6.6GB）
-- train 2514 分片 × ~25.2K ≈ **6360 万局面**；val 200 分片
-- 每个 npz：`board (N,2,15,15) uint8`、`policy (N,225) int16 计数`、`value (N,3) float16`
-
-### 冒烟 / 全量
-
 ```bash
 # 冒烟（N 个分片，几分钟）
-uv run python -m training.train --data /home/kita-ikuyo/dataset/processed \
-  --limit-shards 5 --epochs 1 --batch-size 1024 --device cuda --out runs/smoke
+uv run python -m training.train --limit-shards 5 --epochs 1 --batch-size 1024 --out runs/smoke
 
-# 全量（3060，2 个 epoch + AMP）
-uv run python -m training.train --data /home/kita-ikuyo/dataset/processed \
-  --epochs 2 --batch-size 1024 --device cuda --amp --out runs/full
+# 全量（推荐 3060，2 个 epoch + AMP）
+uv run python -m training.train --epochs 2 --batch-size 1024 --device cuda --amp --out runs/full
 ```
 
+数据目录默认读 `.env` 的 `GOBANG_PROCESSED_DIR`，也可 `--data` 显式覆盖。
 每 `--save-every`（默认 100）个分片自动 eval + 存 `ckpt_ep{epoch}_shard{si}.pt`
 （内含 `model` state_dict + `args` 训练参数），同时打印 `val policy_top1`。
 
@@ -95,10 +123,10 @@ uv run python -m training.train --data /home/kita-ikuyo/dataset/processed \
 
 | GPU | torch 版本 | 说明 |
 |---|---|---|
-| GTX 1060（Pascal sm_61） | **2.12.1+cu126**（Python 3.14 有 cp314 wheel，已实测 CUDA 可用） | cu130 不支持 Pascal；Pascal FP16 无加速，**不要 `--amp`** |
+| GTX 1060（Pascal sm_61） | **2.12.1+cu126**（Python 3.14 有 cp314 wheel，实测 CUDA 可用） | cu130 不支持 Pascal；Pascal FP16 无加速，**不要 `--amp`** |
 | RTX 3060（Ampere sm_86） | 2.12.1+cu126 或 2.13+cu130 均可 | 建议 `--amp`（FP16 张量核） |
 
-1060 安装命令（配合已有 uv.toml 清华源默认）：
+在已有 uv 镜像源配置基础上追加 PyTorch 官方索引装 cu126：
 
 ```bash
 uv pip install "torch==2.12.1+cu126" "torchvision==0.27.1+cu126" \
@@ -114,24 +142,20 @@ uv pip install "torch==2.12.1+cu126" "torchvision==0.27.1+cu126" \
 | GTX 1060 FP32 | ~900 样本/s | ~20 小时 |
 | RTX 3060 + AMP | ~2500–3300 样本/s（估） | ~6–8 小时 |
 
-当前模型进度：60 分片（151 万局面）→ `policy_top1=0.510`，`value_top1=0.659`，
-对战贪心 **12:0 全胜**（平均 36.5 手）。
+参考进度：60 分片（151 万局面）→ `policy_top1=0.510`，`value_top1=0.659`，对战贪心 12:0 全胜。
 
-## 远程监控 GPU（机械盘上训练也放心）
+## 远程监控 GPU
 
 ```bash
 # 落盘 CSV（每 10s 记 功率/温度/占用/显存），远程 tail 即可
 nohup bash scripts/gpu_monitor.sh runs/gpu_monitor.csv > /dev/null 2>&1 &
-
-# 实时看（SSH）
-ssh 用户名@主机 "tail -f /usr/local/projects/OLD/gobang/runs/gpu_monitor.csv"
 ```
 
-其他方式：`ssh -t 主机 "watch -n1 nvidia-smi"`、`gpustat`、`nvtop`；
-无公网 IP 时用 Tailscale 组网。1060 满载训练功率 80–130W，util 85%+。
+实时看：`ssh 主机 "watch -n1 nvidia-smi"`、`gpustat`、`nvtop`（在项目目录下
+`tail -f runs/gpu_monitor.csv` 即可）。无公网 IP 时用 Tailscale 组网。
 
 ## 下一步
 
 - 全量监督训练（63.6M × 2 epoch）→ 更强的策略/价值头
 - 自对弈 RL（6×96 轻量模型用于提速）
-- 贪心/point15 已确认弱于 60-shard 模型，后续以 NN 对局为准
+- 贪心/point15 已确认弱于当前 NN 模型，后续以 NN 对局为准

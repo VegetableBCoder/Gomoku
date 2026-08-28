@@ -2,9 +2,11 @@
 """下载 ModelScope 数据集 sigmoid/katago-gomoku-distill-2025.5 的 fs15x 子集。
 
 用法:
-    python3 download_ms_dataset.py
-    python3 download_ms_dataset.py --target /home/kita-ikuyo/dataset --subset fs15x_label28b
-    python3 download_ms_dataset.py --no-proxy        # 国内直连，不走代理
+    uv run python scripts/download_ms_dataset.py
+    uv run python scripts/download_ms_dataset.py --target ./data --subset fs15x_label28b
+    uv run python scripts/download_ms_dataset.py --no-proxy   # 不走代理直连
+
+目标目录默认读项目根目录 .env 的 GOBANG_DATA_ROOT（见 .env.example）。
 
 说明:
     - 只下载 fs15x_label28b (无禁手 15x15, ~11.9GB, 5432 个文件)
@@ -21,6 +23,11 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+# 支持直接运行: python scripts/download_ms_dataset.py（把项目根加进 sys.path）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from gomoku.config import data_root
 
 BASE = "https://modelscope.cn/api/v1/datasets/sigmoid/katago-gomoku-distill-2025.5"
 
@@ -75,7 +82,8 @@ def download_one(task, target_dir: Path, opener):
 
 def main():
     ap = argparse.ArgumentParser(description="下载 katago-gomoku-distill fs15x 子集")
-    ap.add_argument("--target", default="/home/kita-ikuyo/dataset")
+    ap.add_argument("--target", default=str(data_root()),
+                    help="下载根目录（默认读 .env 的 GOBANG_DATA_ROOT）")
     ap.add_argument("--subset", default="fs15x_label28b")
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--no-proxy", action="store_true")

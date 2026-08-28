@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把原始 KataGomo npz 分片裁剪成训练用的精简格式。
 
-输入 (raw):  /home/kita-ikuyo/dataset/fs15x_label28b/{train,val}/data*.npz
-输出 (out):  /home/kita-ikuyo/dataset/processed/{train,val}/data*.npz
+输入 (raw):  {GOBANG_RAW_DIR}/{train,val}/data*.npz      (见 .env)
+输出 (out):  {GOBANG_PROCESSED_DIR}/{train,val}/data*.npz
 
 每个输出 npz 只保留 3 个数组:
     board  (N, 2, 15, 15) uint8   己方/对方棋子 (已 unpack，省去训练时 unpackbits)
@@ -10,8 +10,7 @@
     value  (N, 3)        float16  胜率/负率/和棋率
 
 用法:
-    uv pip install numpy                # 装到 .venv
-    .venv/bin/python preprocess_katago.py --workers 8
+    uv run python scripts/preprocess_katago.py --workers 8
 """
 import argparse
 import sys
@@ -19,6 +18,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
+
+# 支持直接运行: python scripts/preprocess_katago.py（把项目根加进 sys.path）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from gomoku.config import processed_dir, raw_dir
 
 
 def process_shard(task):
@@ -41,8 +45,10 @@ def process_shard(task):
 
 def main():
     ap = argparse.ArgumentParser(description="裁剪 KataGomo npz -> 训练格式")
-    ap.add_argument("--raw", default="/home/kita-ikuyo/dataset/fs15x_label28b")
-    ap.add_argument("--out", default="/home/kita-ikuyo/dataset/processed")
+    ap.add_argument("--raw", default=str(raw_dir()),
+                    help="原始数据目录（默认读 .env 的 GOBANG_RAW_DIR）")
+    ap.add_argument("--out", default=str(processed_dir()),
+                    help="输出目录（默认读 .env 的 GOBANG_PROCESSED_DIR）")
     ap.add_argument("--workers", type=int, default=8)
     args = ap.parse_args()
 
