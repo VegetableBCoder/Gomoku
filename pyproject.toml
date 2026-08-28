@@ -5,8 +5,8 @@ description = "五子棋: 纯逻辑引擎 + 贪心棋手 + KataGo 蒸馏数据�
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
+    "pillow",
 ]
 
 [project.optional-dependencies]
-gui = ["pillow"]
 train = ["torch"]
