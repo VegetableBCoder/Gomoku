@@ -152,6 +152,11 @@ nohup bash scripts/gpu_monitor.sh runs/gpu_monitor.csv > /dev/null 2>&1 &
 实时看：`ssh 主机 "watch -n1 nvidia-smi"`、`gpustat`、`nvtop`（在项目目录下
 `tail -f runs/gpu_monitor.csv` 即可）。无公网 IP 时用 Tailscale 组网。
 
+## 训练优化清单
+
+优化方案的逐条评审、待实施清单、12×192 冒烟决策门见
+[`docs/training-optimization.md`](docs/training-optimization.md)。
+
 ## 下一步
 
 - 全量监督训练（63.6M × 2 epoch）→ 更强的策略/价值头
