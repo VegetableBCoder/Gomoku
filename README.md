@@ -11,21 +11,18 @@
 要求：uv ≥ 0.12、Python ≥ 3.10（推荐 3.14）。
 
 ```bash
-# 1. 配置镜像源（可选，国内建议清华源，并让 uv 不走本地代理）
-#    cp .env.example .env 后按需修改
-#    [pip] index-url = https://pypi.tuna.tsinghua.edu.cn/simple   # uv.toml
-#    确保 NO_PROXY 包含 pypi.tuna.tsinghua.edu.cn
+# 1. 配置镜像源（可选，国内建议国内镜像源）
 
 # 2. 安装依赖（核心 + GUI）
 uv sync
 
-# 3. GUI 需要系统 tkinter（Debian/Ubuntu）
+# 3. GUI 需要系统 tkinter（Debian/Ubuntu需要 windows似乎不需要）
 sudo apt install -y python3-tk
 ```
 
 ## 环境配置（.env）
 
-项目内所有路径都通过项目根目录的 `.env` 配置，**不硬编码任何本机绝对路径**。
+项目内本地绝对路径都通过项目根目录的 `.env` 。
 复制模板并按需修改：
 
 ```bash
@@ -41,8 +38,7 @@ cp .env.example .env
 | `GOBANG_RUNS_DIR` | `./runs` | 训练输出目录 |
 | `GOBANG_MODEL_DIR` | `./models` | 模型 checkpoint 存放目录 |
 
-优先级：进程环境变量 > `.env` > 默认值。`.env` 不入库（gitignore），迁移给别人
-只需给 `.env.example`。
+优先级：进程环境变量 > `.env` > 默认值
 
 ## 目录结构
 
@@ -84,14 +80,16 @@ uv run python scripts/download_ms_dataset.py
 uv run python scripts/preprocess_katago.py --workers 8
 ```
 
-处理完的 `data/processed` 里：train 2514 分片 × ~25.2K ≈ **6360 万局面**；val 200 分片。
+处理完的 `data/processed` 里：train 2514 分片, 数据源作者声称50M数据；val 200 分片。
 每个 npz：`board (N,2,15,15) uint8`、`policy (N,225) int16 计数`、`value (N,3) float16`。
 
 ## 快速上手
 
 ```bash
-# 人机对战（电脑 = 贪心）
+# 人机对战（电脑 = 贪心By Deepseek）
 uv run python gui.py
+# 人机对战 (电脑 = point15 By 2017年刚开始写代码的自己)
+uv run python gui.py --player point15
 
 # 人机对战（电脑 = 神经网络，--model 指向任意 checkpoint）
 uv run python gui.py --model models/ckpt_ep0_shard59.pt
@@ -111,7 +109,7 @@ uv run python -m tests.test_board
 # 冒烟（N 个分片，几分钟）
 uv run python -m training.train --limit-shards 5 --epochs 1 --batch-size 1024 --out runs/smoke
 
-# 全量（推荐 3060，2 个 epoch + AMP）
+# 全量（推荐 GPU，2 个 epoch + AMP）
 uv run python -m training.train --epochs 2 --batch-size 1024 --device cuda --amp --out runs/full
 ```
 
@@ -119,7 +117,7 @@ uv run python -m training.train --epochs 2 --batch-size 1024 --device cuda --amp
 每 `--save-every`（默认 100）个分片自动 eval + 存 `ckpt_ep{epoch}_shard{si}.pt`
 （内含 `model` state_dict + `args` 训练参数），同时打印 `val policy_top1`。
 
-### GPU 兼容性（重要）
+### GPU 兼容性（作者运行过的环境配置）
 
 | GPU | torch 版本 | 说明 |
 |---|---|---|
@@ -159,3 +157,7 @@ nohup bash scripts/gpu_monitor.sh runs/gpu_monitor.csv > /dev/null 2>&1 &
 - 全量监督训练（63.6M × 2 epoch）→ 更强的策略/价值头
 - 自对弈 RL（6×96 轻量模型用于提速）
 - 贪心/point15 已确认弱于当前 NN 模型，后续以 NN 对局为准
+
+## 其他
+
+* 作者运系统环境 Ubuntu 26.04 + 7700hq + m1060 + Cuda 13 
