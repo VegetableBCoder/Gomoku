@@ -1,0 +1,18 @@
+{
+  "data": "/home/kita-ikuyo/dataset/processed",
+  "blocks": 8,
+  "channels": 128,
+  "epochs": 1,
+  "batch_size": 1024,
+  "lr": 0.001,
+  "wd": 0.0001,
+  "value_weight": 0.5,
+  "limit_shards": 60,
+  "val_shards": 3,
+  "log_every": 5,
+  "save_every": 100,
+  "out": "runs/probe60",
+  "amp": false,
+  "device": "cuda",
+  "seed": 0
+}
