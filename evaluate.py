@@ -3,7 +3,7 @@
 用法:
     python evaluate.py --p1 greedy --p2 random --games 100
     python evaluate.py --p1 greedy --p2 greedy --games 20 --seed 7
-    python evaluate.py --p1 greedy --p2 random --games 100 --show-board
+    python evaluate.py --p1 nn --p2 greedy --ckpt runs/smoke/ckpt_ep0_shard4.pt --games 20
 """
 from __future__ import annotations
 
@@ -19,14 +19,22 @@ PLAYERS = {
     "greedy": GreedyPlayer,
     "random": RandomPlayer,
     "point15": Point15Player,
+    "nn": None,      # 需要 --ckpt，见 build_player
 }
 
 
-def play_once(cls1, cls2, size: int, seed: int, first: int):
+def build_player(name: str, color: int, ckpt: str | None):
+    if name == "nn":
+        if not ckpt:
+            raise SystemExit("--p1/--p2 选了 nn 时必须提供 --ckpt 路径")
+        from gomoku.players.nn_player import NNetPlayer
+        return NNetPlayer(color, ckpt)
+    return PLAYERS[name](color=color)
+
+
+def play_once(p1, p2, size: int, seed: int, first: int):
     """first: 1=p1执黑先手, 2=p2执黑先手。返回 (胜方颜色, 手数)。"""
     rng = random.Random(seed)
-    p1 = cls1(color=Board.BLACK if first == 1 else Board.WHITE)
-    p2 = cls2(color=Board.WHITE if first == 1 else Board.BLACK)
     board = Board(size)
     turn = Board.BLACK
     while not board.is_full():
@@ -46,6 +54,8 @@ def main():
     ap = argparse.ArgumentParser(description="棋手对局评估")
     ap.add_argument("--p1", choices=list(PLAYERS), default="greedy")
     ap.add_argument("--p2", choices=list(PLAYERS), default="random")
+    ap.add_argument("--ckpt", metavar="CKPT.pt", default=None,
+                    help="nn 棋手使用的 checkpoint（p1/p2 含 nn 时必填）")
     ap.add_argument("--games", type=int, default=100)
     ap.add_argument("--size", type=int, default=15)
     ap.add_argument("--seed", type=int, default=0)
@@ -55,8 +65,9 @@ def main():
     total = 0
     for g in range(args.games):
         first = 1 if g % 2 == 0 else 2        # 黑白轮流坐庄
-        winner, moves = play_once(PLAYERS[args.p1], PLAYERS[args.p2],
-                                  args.size, args.seed * 10000 + g, first)
+        p1 = build_player(args.p1, Board.BLACK if first == 1 else Board.WHITE, args.ckpt)
+        p2 = build_player(args.p2, Board.WHITE if first == 1 else Board.BLACK, args.ckpt)
+        winner, moves = play_once(p1, p2, args.size, args.seed * 10000 + g, first)
         total += moves
         if winner == 0:
             draw += 1

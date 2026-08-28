@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
@@ -24,12 +25,14 @@ STARS = [(3, 3), (3, 7), (3, 11), (7, 3), (7, 7), (7, 11),
 
 
 class GomokuApp:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, make_engine=None):
         self.root = root
-        root.title("瓜皮五子棋 · 贪心版 (15×15)")
+        root.title("瓜皮五子棋 (15×15)")
         self.board = Board(N)
         self.after_id = None
         self.locked = False
+        # make_engine(color) -> 棋手实例；默认贪心，--model 时换神经网络
+        self.make_engine = make_engine or (lambda color: GreedyPlayer(color=color))
 
         base = Path(__file__).resolve().parent / "legacy"
         self.black_img = self._load(base / "black.png")
@@ -123,7 +126,7 @@ class GomokuApp:
     def computer_move(self):
         self.after_id = None
         comp = 3 - self.human_color()
-        mv = GreedyPlayer(color=comp).choose_move(self.board)
+        mv = self.make_engine(comp).choose_move(self.board)
         if mv is not None:
             self.board.place(*mv, comp)
         self.locked = False
@@ -150,8 +153,23 @@ class GomokuApp:
 
 
 def main():
+    ap = argparse.ArgumentParser(description="人机五子棋 (电脑默认=贪心)")
+    ap.add_argument("--model", metavar="CKPT.pt",
+                    help="用神经网络 checkpoint 当电脑 (如 runs/smoke/ckpt_ep0_shard4.pt)")
+    ap.add_argument("--device", default=None,
+                    help="模型推理设备: cpu / cuda (默认自动选择)")
+    ap.add_argument("--temperature", type=float, default=0.0,
+                    help="模型选点温度: 0=贪心取最大概率 (默认), >0=按概率采样")
+    args = ap.parse_args()
+
     root = tk.Tk()
-    GomokuApp(root)
+    if args.model:
+        from gomoku.players.nn_player import NNetPlayer
+        make_engine = lambda color: NNetPlayer(
+            color, args.model, device=args.device, temperature=args.temperature)
+    else:
+        make_engine = lambda color: GreedyPlayer(color=color)
+    GomokuApp(root, make_engine)
     root.mainloop()
 
 
