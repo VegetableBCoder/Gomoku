@@ -15,6 +15,8 @@ from PIL import Image, ImageTk
 
 from gomoku.board import Board
 from gomoku.players.greedy import GreedyPlayer
+from gomoku.players.point15_player import Point15Player
+from gomoku.players.random import RandomPlayer
 
 N = 15
 CELL = 36
@@ -22,6 +24,13 @@ MARGIN = 28
 CANVAS = MARGIN * 2 + (N - 1) * CELL        # 560
 STARS = [(3, 3), (3, 7), (3, 11), (7, 3), (7, 7), (7, 11),
          (11, 3), (11, 7), (11, 11)]
+
+# 人机对战的电脑棋手（--model 指定时用神经网络，忽略此项）
+ENGINES = {
+    "greedy": GreedyPlayer,
+    "point15": Point15Player,
+    "random": RandomPlayer,
+}
 
 
 class GomokuApp:
@@ -109,7 +118,8 @@ class GomokuApp:
     def on_click(self, event):
         if self.locked:
             return
-        if len(self.board.history) % 2 != 0:     # 电脑刚下完，等你
+        nxt = Board.BLACK if len(self.board.history) % 2 == 0 else Board.WHITE
+        if nxt != self.human_color():            # 还没轮到玩家（含玩家执白时电脑先手后）
             return
         col = round((event.x - MARGIN) / CELL)
         row = round((event.y - MARGIN) / CELL)
@@ -154,6 +164,8 @@ class GomokuApp:
 
 def main():
     ap = argparse.ArgumentParser(description="人机五子棋 (电脑默认=贪心)")
+    ap.add_argument("--player", choices=list(ENGINES), default="greedy",
+                    help="电脑棋手: greedy(默认)/point15/random (指定 --model 时忽略)")
     ap.add_argument("--model", metavar="CKPT.pt",
                     help="用神经网络 checkpoint 当电脑 (如 runs/smoke/ckpt_ep0_shard4.pt)")
     ap.add_argument("--device", default=None,
@@ -168,7 +180,8 @@ def main():
         make_engine = lambda color: NNetPlayer(
             color, args.model, device=args.device, temperature=args.temperature)
     else:
-        make_engine = lambda color: GreedyPlayer(color=color)
+        engine_cls = ENGINES[args.player]
+        make_engine = lambda color: engine_cls(color=color)
     GomokuApp(root, make_engine)
     root.mainloop()
 

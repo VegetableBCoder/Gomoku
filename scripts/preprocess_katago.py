@@ -30,7 +30,7 @@ def process_shard(task):
         data = np.load(src)
         n = data["binaryInputNCHWPacked"].shape[0]
         # 每通道 29 字节=232 位, 棋盘只占前 225 位, 必须裁掉 7 位 padding 再 reshape
-        board = np.unpackbits(data["binaryInputNCHWPacked"], axis=2)[:, 1:3, :225]            .reshape(n, 2, 15, 15)
+        board = np.unpackbits(data["binaryInputNCHWPacked"], axis=2)[:, 1:3, :225].reshape(n, 2, 15, 15)
         policy = data["policyTargetsNCMove"][:, 0, :225].astype(np.int16)
         value = data["globalTargetsNC"][:, :3].astype(np.float16)
         np.savez_compressed(dst, board=board, policy=policy, value=value)
@@ -56,7 +56,7 @@ def main():
 
     tasks = []
     for s in srcs:
-        rel = s.relative_to(raw)          # 例如 train/data0.npz
+        rel = s.relative_to(raw)  # 例如 train/data0.npz
         tasks.append((s, out / rel))
 
     done = ok = skip = errs = 0
