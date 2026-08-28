@@ -230,3 +230,7 @@ tools/opencode-usage-stats
 logs/
 temp/
 apks/
+
+# 训练输出
+runs/
+*.log

@@ -1,11 +1,15 @@
 [project]
 name = "gobang"
-version = "0.1.0"
-description = "瓜皮五子棋 (2017)"
+version = "0.2.0"
+description = "五子棋: 纯逻辑引擎 + 贪心棋手 + KataGo 蒸馏数据训练"
 requires-python = ">=3.10"
 dependencies = [
-    "pillow==12.3.0",
+    "numpy",
 ]
+
+[project.optional-dependencies]
+gui = ["pillow"]
+train = ["torch"]
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
