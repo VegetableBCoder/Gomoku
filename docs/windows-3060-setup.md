@@ -79,7 +79,7 @@ nvidia-smi --query-gpu=power.draw,temperature.gpu,utilization.gpu,memory.used --
 ```powershell
 New-Item -ItemType Directory -Force runs | Out-Null
 $py = ".\.venv\Scripts\python.exe"
-$trainArgs = @('-m','training.train','--blocks','12','--channels','192','--limit-shards','2','--epochs','1','--batch-size','512','--device','cuda','--amp','--out','runs/probe3060_12x192')
+$trainArgs = @('-m','training.train','--blocks','12','--channels','192','--epochs','1','--batch-size','768','--device','cuda','--amp','--out','runs/probe3060_12x192')
 $p = Start-Process -FilePath $py -ArgumentList $trainArgs -RedirectStandardOutput 'runs\probe.log' -RedirectStandardError 'runs\probe.err' -WindowStyle Hidden -PassThru
 $p.Id            # 记下进程号
 Get-Content runs\probe.log -Wait -Tail 20   # 实时看日志
@@ -126,3 +126,4 @@ wsl --install -d Ubuntu        # Windows 驱动已支持 WSL CUDA，无需装 Li
 4. 结果填 docs/training-optimization.md 的表格，异常贴 runs/probe.err
 5. 本笔记用完可删
 
+uv run python -m training.train --resume runs/full_12x192/ckpt_ep0_shard699.pt --device cuda --lr 3e-4

@@ -67,11 +67,30 @@ def main():
     ap.add_argument("--val-shards", type=int, default=3)
     ap.add_argument("--log-every", type=int, default=5)
     ap.add_argument("--save-every", type=int, default=100, help="每 N 个分片评估+存一次 checkpoint")
-    ap.add_argument("--out", default="runs/smoke")
+    ap.add_argument("--out", default=None,
+                    help="输出目录（默认 runs/smoke；--resume 未给时沿用 ckpt 里的 out）")
     ap.add_argument("--amp", action="store_true")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--resume", default=None,
+                    help="从 checkpoint 断点续训：新格式恢复 权重+优化器+scheduler+scaler 并从断点 shard 继续；"
+                         "旧格式（无 trainer 字段）仅恢复权重、优化器/scheduler 从头")
     args = ap.parse_args()
+
+    # --resume: 覆盖结构与数据相关参数，保证网络结构 / shuffle 顺序 / lr schedule 与原始训练一致
+    _resume_core = ("blocks", "channels", "epochs", "batch_size",
+                    "limit_shards", "val_shards", "data", "seed", "device", "amp")
+    resume_ckpt = None
+    if args.resume:
+        resume_ckpt = torch.load(args.resume, map_location="cpu", weights_only=False)
+        saved = resume_ckpt.get("args") or {}
+        for k in _resume_core:
+            if k in saved:
+                setattr(args, k, saved[k])
+        if not args.out:
+            args.out = saved.get("out", "runs/smoke")
+    if not args.out:
+        args.out = "runs/smoke"
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -93,15 +112,36 @@ def main():
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total_steps)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
+    start_epoch, start_shard, step = 0, 0, 0
+    if resume_ckpt is not None:
+        model.load_state_dict(resume_ckpt["model"])
+        trainer = resume_ckpt.get("trainer")
+        if trainer:
+            opt.load_state_dict(trainer["optimizer"])
+            sched.load_state_dict(trainer["scheduler"])
+            if "scaler" in trainer:
+                scaler.load_state_dict(trainer["scaler"])
+            start_epoch = int(trainer["epoch"])
+            start_shard = int(trainer["shard"]) + 1
+            step = int(trainer["step"])
+            print(f"恢复训练: epoch {start_epoch}, 从 shard {start_shard} 起, step {step}",
+                  flush=True)
+        else:
+            print("警告: checkpoint 为旧格式（无优化器/scheduler 状态），仅恢复模型权重，"
+                  "lr 从初始值重新开始", flush=True)
+        if start_epoch >= args.epochs:
+            raise SystemExit(f"checkpoint 已训练完所有 epoch ({start_epoch} >= {args.epochs})，无需续训")
+
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "args.json").write_text(json.dumps(vars(args), indent=2, ensure_ascii=False))
 
     bs = args.batch_size
-    step = 0
     t_start = time.time()
-    for epoch in range(args.epochs):
+    for epoch in range(start_epoch, args.epochs):
         for si, f in enumerate(trainset.shuffled_files()):
+            if epoch == start_epoch and si < start_shard:
+                continue
             t0 = time.time()
             board, policy, value = KatagoShards.load_shard(f)
             n = len(board)
@@ -128,8 +168,18 @@ def main():
                 pl, pa, va = evaluate(model, valset, device, bs, args.amp)
                 print(f"  [eval @shard{si}] val: pl={pl:.4f} policy_top1={pa:.4f} "
                       f"value_top1={va:.4f}", flush=True)
-                torch.save({"model": model.state_dict(), "args": vars(args)},
-                           out / f"ckpt_ep{epoch}_shard{si}.pt")
+                torch.save({
+                    "model": model.state_dict(),
+                    "args": vars(args),
+                    "trainer": {
+                        "epoch": epoch,
+                        "shard": si,
+                        "step": step,
+                        "optimizer": opt.state_dict(),
+                        "scheduler": sched.state_dict(),
+                        "scaler": scaler.state_dict(),
+                    },
+                }, out / f"ckpt_ep{epoch}_shard{si}.pt")
 
     elapsed = time.time() - t_start
     print(f"完成: {elapsed/60:.1f} min, checkpoint -> {out}")
