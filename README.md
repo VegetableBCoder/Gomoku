@@ -1,5 +1,12 @@
 # 瓜皮五子棋 2.0
 
+## 分支lagacy
+
+- 2017年刚学PYTHON的时候写的垃圾实现
+- 别问为啥是19*19的围棋棋盘 问就是不会围棋 也不会五子棋
+
+## 分支 main
+
 纯逻辑引擎 + 贪心/神经网络棋手 + KataGo 蒸馏数据监督训练（自对弈 RL 规划中）。
 
 - 规则：自由规则（无禁手），长连（≥5）即胜；黑先手优势显著
@@ -165,4 +172,9 @@ nohup bash scripts/gpu_monitor.sh runs/gpu_monitor.csv > /dev/null 2>&1 &
 
 ## 其他
 
-* 作者运系统环境 Ubuntu 26.04 + 7700hq + m1060 + Cuda 13 
+### 作者运系统环境
+
+* Ubuntu 26.04 + 7700hq + m1060 + Cuda 13 
+* Win 10 + R7 5800H + m3060 + Cuda 13
+ 
+
