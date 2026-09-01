@@ -10,7 +10,7 @@
 纯逻辑引擎 + 贪心/神经网络棋手 + KataGo 蒸馏数据监督训练（自对弈 RL 规划中）。
 
 - 规则：自由规则（无禁手），长连（≥5）即胜；黑先手优势显著
-- 网络：8×128 残差 CNN 双头（policy+value，约 2.38M 参数）
+- 网络：12×192 残差 CNN 双头（policy+value，约 8M 参数）
 - 数据：ModelScope katago-gomoku-distill 2025.5 fs15x（约 6300 万局面，73M 老师蒸馏软标签）
 
 ## 环境与安装
@@ -99,15 +99,9 @@ uv run python gui.py
 uv run python gui.py --player point15
 
 # 人机对战（电脑 = 神经网络，--model 指向任意 checkpoint）
-uv run python gui.py --model models/ckpt_ep0_shard59.pt
+uv run python gui.py --model models/model-name.pt
 #   可选: --device cuda/cpu  --temperature 0.3(采样) 0(贪心,默认)
 
-# 对战评估
-uv run python evaluate.py --p1 greedy --p2 random --games 100
-uv run python evaluate.py --p1 nn --p2 greedy --ckpt models/ckpt_ep0_shard59.pt --games 20
-
-# 单测
-uv run python -m tests.test_board
 ```
 
 ## 训练
@@ -148,27 +142,17 @@ uv pip install "torch==2.12.1+cu126" "torchvision==0.27.1+cu126" \
 | RTX 3060 + AMP | ~2500–3300 样本/s（估） | ~6–8 小时 |
 
 参考进度：60 分片（151 万局面）→ `policy_top1=0.510`，`value_top1=0.659`，对战贪心 12:0 全胜。
+最终训练: RTX 3060+AMP+12*192 吞吐约1400/s, 完整epoch总训练时长约13h
 
-## 远程监控 GPU
+## 评测
 
-```bash
-# 落盘 CSV（每 10s 记 功率/温度/占用/显存），远程 tail 即可
-nohup bash scripts/gpu_monitor.sh runs/gpu_monitor.csv > /dev/null 2>&1 &
-```
-
-实时看：`ssh 主机 "watch -n1 nvidia-smi"`、`gpustat`、`nvtop`（在项目目录下
-`tail -f runs/gpu_monitor.csv` 即可）。无公网 IP 时用 Tailscale 组网。
-
-## 训练优化清单
-
-优化方案的逐条评审、待实施清单、12×192 冒烟决策门见
-[`docs/training-optimization.md`](docs/training-optimization.md)。
+* 打point/greedy 先后手100场全胜(温度0.3)
+* 打[外部模型](https://modelscope.cn/models/HUBUGUII/Gomoku-MultiSize-PolicyValue), 狠狠吃参数量和训练数据量优势, val验证集双方各落四子, 纯策略对战先后手胜率90+, 给外部加上MCTS, 先手胜率90+, 后手80+
 
 ## 下一步
 
-- 全量监督训练（63.6M × 2 epoch）→ 更强的策略/价值头
-- 自对弈 RL（6×96 轻量模型用于提速）
-- 贪心/point15 已确认弱于当前 NN 模型，后续以 NN 对局为准
+- 自对弈数据集生成
+- 继续训练
 
 ## 其他
 
